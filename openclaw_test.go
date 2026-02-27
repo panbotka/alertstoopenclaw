@@ -10,6 +10,8 @@ import (
 )
 
 func TestBuildPrompt(t *testing.T) {
+	t.Parallel()
+
 	payload := &AlertmanagerPayload{
 		Version: "4",
 		Status:  "firing",
@@ -39,6 +41,8 @@ func TestBuildPrompt(t *testing.T) {
 }
 
 func TestForward_Success(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -57,6 +61,8 @@ func TestForward_Success(t *testing.T) {
 }
 
 func TestForward_Retry(t *testing.T) {
+	t.Parallel()
+
 	var count atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		n := count.Add(1)
@@ -85,6 +91,8 @@ func TestForward_Retry(t *testing.T) {
 }
 
 func TestForward_AllRetriesFail(t *testing.T) {
+	t.Parallel()
+
 	var count atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count.Add(1)
@@ -113,6 +121,8 @@ func TestForward_AllRetriesFail(t *testing.T) {
 }
 
 func TestForward_ContextCancelled(t *testing.T) {
+	t.Parallel()
+
 	var count atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count.Add(1)

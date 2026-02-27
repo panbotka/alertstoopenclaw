@@ -23,6 +23,16 @@ When an alert fires, alertstoopenclaw formats a structured prompt containing the
 - Non-root Docker container
 - Zero external dependencies (Go stdlib only)
 
+## Prerequisites
+
+- Go 1.25+
+- [golangci-lint](https://golangci-lint.run/) (for development)
+
+## Documentation
+
+- [Architecture](docs/architecture.md) — system design, data flow, and key decisions
+- [API Reference](docs/api.md) — endpoint specifications with examples
+
 ## Quick Start
 
 ```bash
@@ -85,7 +95,23 @@ Returns `200 OK` with `{"status":"ok"}`.
 5. The prompt includes the raw alert JSON with instructions to investigate, diagnose, and remediate
 6. OpenClaw handles all investigation and reporting through its own channels
 
+## Development
+
+```bash
+make check    # fmt → vet → lint → test (full CI-equivalent check)
+make test     # run tests with race detector and coverage
+make lint     # run golangci-lint with strict config (27 linters)
+make fmt      # format all Go source files
+./dev.sh      # build and run with PID tracking
+```
+
 ## Testing
+
+Run the test suite:
+
+```bash
+make test
+```
 
 Send a test alert:
 

@@ -38,6 +38,7 @@ type chatRequest struct {
 	Stream   bool          `json:"stream"`
 }
 
+// chatMessage represents a single message in the OpenClaw chat API request.
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -70,7 +71,7 @@ func (c *OpenClawClient) doRequest(ctx context.Context, url string, body []byte,
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.token)
 
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req) //nolint:gosec // G704: URL is from server config, not user input.
 	if err != nil {
 		slog.Warn("openclaw request error", "attempt", attempt, "error", err)
 		return fmt.Errorf("request failed: %w", err)
@@ -86,6 +87,7 @@ func (c *OpenClawClient) doRequest(ctx context.Context, url string, body []byte,
 	errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 	_ = resp.Body.Close()
 
+	//nolint:gosec // G706: structured slog key-value, not string interpolation.
 	slog.Warn("openclaw non-2xx response", "attempt", attempt, "status", resp.StatusCode, "body", string(errBody))
 	return fmt.Errorf("openclaw returned status %d", resp.StatusCode)
 }
@@ -115,7 +117,7 @@ func (c *OpenClawClient) Forward(ctx context.Context, payload *AlertmanagerPaylo
 	var lastErr error
 	for attempt := range 3 {
 		if attempt > 0 {
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second // 1s, 2s
+			backoff := time.Duration(1<<(attempt-1)) * time.Second //nolint:gosec // G115: attempt is 1 or 2, no overflow.
 			slog.Info("retrying openclaw request", "attempt", attempt+1, "backoff", backoff)
 			select {
 			case <-time.After(backoff):

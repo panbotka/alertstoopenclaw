@@ -6,7 +6,6 @@ import (
 	"sync"
 )
 
-
 // AlertQueue processes alert payloads sequentially via a single consumer goroutine.
 type AlertQueue struct {
 	ch       chan *AlertmanagerPayload

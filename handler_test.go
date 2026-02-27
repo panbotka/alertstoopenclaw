@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-func testPayload(status string) string {
+func testPayload(t *testing.T, status string) string {
+	t.Helper()
 	p := AlertmanagerPayload{
 		Version: "4",
 		Status:  status,
@@ -28,11 +29,90 @@ func testPayload(status string) string {
 		CommonAnnotations: map[string]string{"summary": "test alert"},
 		ExternalURL:       "http://grafana:3000",
 	}
-	b, _ := json.Marshal(p)
+	b, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("failed to marshal test payload: %v", err)
+	}
 	return string(b)
 }
 
+func TestWebhookHandler_validation(t *testing.T) { //nolint:gocognit // table-driven test with subtests.
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		webhookToken string
+		authHeader   string
+		contentType  string
+		body         string
+		wantCode     int
+	}{
+		{
+			name:         "unauthorized when token required but missing",
+			webhookToken: "secret-token",
+			authHeader:   "",
+			contentType:  "application/json",
+			body:         `{"status":"firing","alerts":[]}`,
+			wantCode:     http.StatusUnauthorized,
+		},
+		{
+			name:         "authorized with valid token",
+			webhookToken: "secret-token",
+			authHeader:   "Bearer secret-token",
+			contentType:  "application/json",
+			body:         `{"status":"firing","alerts":[]}`,
+			wantCode:     http.StatusOK,
+		},
+		{
+			name:        "bad JSON returns 400",
+			contentType: "application/json",
+			body:        "{invalid",
+			wantCode:    http.StatusBadRequest,
+		},
+		{
+			name:        "wrong content type returns 415",
+			contentType: "text/xml",
+			body:        `{"status":"firing","alerts":[]}`,
+			wantCode:    http.StatusUnsupportedMediaType,
+		},
+		{
+			name:        "oversized body returns 400",
+			contentType: "application/json",
+			body:        `{"status":"firing","alerts":[` + strings.Repeat(`{"status":"firing","labels":{"x":"`+strings.Repeat("A", 1000)+`"}},`, 1100) + `]}`, //nolint:lll
+			wantCode:    http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := NewOpenClawClient("http://localhost", "token", "model")
+			queue := NewAlertQueue(client)
+			queue.Start()
+			defer queue.Stop()
+
+			mux := NewMux(queue, tt.webhookToken)
+			req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(tt.body))
+			if tt.contentType != "" {
+				req.Header.Set("Content-Type", tt.contentType)
+			}
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+
+			if w.Code != tt.wantCode {
+				t.Fatalf("expected %d, got %d", tt.wantCode, w.Code)
+			}
+		})
+	}
+}
+
 func TestFiringAlert(t *testing.T) {
+	t.Parallel()
+
 	called := make(chan struct{}, 1)
 	ocServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -49,7 +129,7 @@ func TestFiringAlert(t *testing.T) {
 	defer queue.Stop()
 
 	mux := NewMux(queue, "")
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload("firing")))
+	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload(t, "firing")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
@@ -67,6 +147,8 @@ func TestFiringAlert(t *testing.T) {
 }
 
 func TestResolvedAlert(t *testing.T) {
+	t.Parallel()
+
 	var called bool
 	ocServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
@@ -80,7 +162,7 @@ func TestResolvedAlert(t *testing.T) {
 	defer queue.Stop()
 
 	mux := NewMux(queue, "")
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload("resolved")))
+	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload(t, "resolved")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
@@ -94,95 +176,9 @@ func TestResolvedAlert(t *testing.T) {
 	}
 }
 
-func TestUnauthorized(t *testing.T) {
-	client := NewOpenClawClient("http://localhost", "token", "model")
-	queue := NewAlertQueue(client)
-	queue.Start()
-	defer queue.Stop()
-
-	mux := NewMux(queue, "secret-token")
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload("firing")))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", w.Code)
-	}
-}
-
-func TestAuthValid(t *testing.T) {
-	client := NewOpenClawClient("http://localhost", "token", "model")
-	queue := NewAlertQueue(client)
-	queue.Start()
-	defer queue.Stop()
-
-	mux := NewMux(queue, "secret-token")
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload("firing")))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer secret-token")
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestBadJSON(t *testing.T) {
-	client := NewOpenClawClient("http://localhost", "token", "model")
-	queue := NewAlertQueue(client)
-	queue.Start()
-	defer queue.Stop()
-
-	mux := NewMux(queue, "")
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader("{invalid"))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestOversizedBody(t *testing.T) {
-	client := NewOpenClawClient("http://localhost", "token", "model")
-	queue := NewAlertQueue(client)
-	queue.Start()
-	defer queue.Stop()
-
-	mux := NewMux(queue, "")
-	// Create a body larger than 1 MB.
-	bigBody := `{"status":"firing","alerts":[` + strings.Repeat(`{"status":"firing","labels":{"x":"`+strings.Repeat("A", 1000)+`"}},`, 1100) + `]}` //nolint:lll
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(bigBody))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestWrongContentType(t *testing.T) {
-	client := NewOpenClawClient("http://localhost", "token", "model")
-	queue := NewAlertQueue(client)
-	queue.Start()
-	defer queue.Stop()
-
-	mux := NewMux(queue, "")
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload("firing")))
-	req.Header.Set("Content-Type", "text/xml")
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("expected 415, got %d", w.Code)
-	}
-}
-
 func TestQueueFull(t *testing.T) {
+	t.Parallel()
+
 	client := NewOpenClawClient("http://localhost", "token", "model")
 	// Create a queue with capacity 1 and don't start the consumer so it stays full.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -197,7 +193,7 @@ func TestQueueFull(t *testing.T) {
 	queue.ch <- &AlertmanagerPayload{}
 
 	mux := NewMux(queue, "")
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload("firing")))
+	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(testPayload(t, "firing")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
@@ -208,6 +204,8 @@ func TestQueueFull(t *testing.T) {
 }
 
 func TestHealthz(t *testing.T) {
+	t.Parallel()
+
 	client := NewOpenClawClient("http://localhost", "token", "model")
 	queue := NewAlertQueue(client)
 	queue.Start()

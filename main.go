@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 )
 
+// main initializes and runs the alertstoopenclaw service.
 func main() {
 	// Structured JSON logging.
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
@@ -30,7 +32,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("starting alertstoopenclaw",
+	slog.Info("starting alertstoopenclaw", //nolint:gosec // G706: structured slog, not string interpolation.
 		"listen_addr", listenAddr,
 		"openclaw_url", openclawURL,
 		"openclaw_model", openclawModel,
@@ -56,7 +58,7 @@ func main() {
 	defer stop()
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("server error", "error", err)
 			stop()
 		}
@@ -78,6 +80,7 @@ func main() {
 	slog.Info("shutdown complete")
 }
 
+// envOr returns the value of the environment variable or the fallback if empty.
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

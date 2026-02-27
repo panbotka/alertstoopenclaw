@@ -11,9 +11,15 @@ OPENCLAW_URL=http://openclaw:18789 OPENCLAW_TOKEN=<token> ./alertstoopenclaw
 
 There are no external dependencies (stdlib only).
 
-**Test:** `make test` (runs `go test -v -race ./...`)
+**Test:** `make test` (runs `go test -v -race -coverprofile=coverage.out ./...` with coverage report)
 
-**Lint:** `golangci-lint run` (strict config in `.golangci.yml`: cyclomatic complexity max 10, exported comment enforcement)
+**Lint:** `make lint` (strict config in `.golangci.yml`: 27 linters including errcheck, govet, staticcheck, gosec, errorlint, cyclop max 10, funlen 60/40, gocognit 15, nestif 3, lll 120)
+
+**Format:** `make fmt` (runs `gofmt -w .`)
+
+**Full check:** `make check` (chains: fmt, vet, lint, test)
+
+**Dev runner:** `./dev.sh` (builds and starts with PID tracking in `.dev.pid`)
 
 **Docker:**
 ```bash
@@ -29,9 +35,11 @@ Stateless bridge service: receives Grafana Alertmanager webhook POSTs, formats a
 Grafana Alertmanager --POST /webhook--> [Go App] --POST /v1/chat/completions--> [OpenClaw]
 ```
 
-**Request flow:** `handler.go` (auth check, content-type/size validation, parse JSON, filter firing-only) → `queue.go` (buffered channel, single consumer goroutine, context-aware shutdown) → `openclaw.go` (build prompt, POST to OpenClaw with 3-retry exponential backoff, context cancellation).
+**Request flow:** `handler.go` (auth via `checkAuth`, content-type via `checkContentType`, body size limit, parse JSON, filter firing-only) → `queue.go` (buffered channel, single consumer goroutine, context-aware shutdown) → `openclaw.go` (build prompt, POST to OpenClaw with 3-retry exponential backoff, context cancellation).
 
 The queue ensures alerts are forwarded one at a time (sequential processing). Fire-and-forget: the app returns 200 to Grafana immediately after enqueuing, and discards the OpenClaw response body.
+
+See [docs/architecture.md](docs/architecture.md) for detailed design and [docs/api.md](docs/api.md) for API reference.
 
 ## Configuration
 
