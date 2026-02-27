@@ -18,6 +18,7 @@ func main() {
 	listenAddr := envOr("LISTEN_ADDR", ":8080")
 	openclawURL := os.Getenv("OPENCLAW_URL")
 	openclawToken := os.Getenv("OPENCLAW_TOKEN")
+	openclawModel := envOr("OPENCLAW_MODEL", "openclaw:main")
 	webhookToken := os.Getenv("WEBHOOK_TOKEN")
 
 	if openclawURL == "" {
@@ -32,18 +33,22 @@ func main() {
 	slog.Info("starting alertstoclaude",
 		"listen_addr", listenAddr,
 		"openclaw_url", openclawURL,
+		"openclaw_model", openclawModel,
 		"webhook_auth", webhookToken != "",
 	)
 
 	// Create components.
-	client := NewOpenClawClient(openclawURL, openclawToken)
+	client := NewOpenClawClient(openclawURL, openclawToken, openclawModel)
 	queue := NewAlertQueue(client)
 	queue.Start()
 
 	mux := NewMux(queue, webhookToken)
 	server := &http.Server{
-		Addr:    listenAddr,
-		Handler: mux,
+		Addr:         listenAddr,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// Graceful shutdown on SIGINT/SIGTERM.
@@ -53,7 +58,7 @@ func main() {
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server error", "error", err)
-			os.Exit(1)
+			stop()
 		}
 	}()
 

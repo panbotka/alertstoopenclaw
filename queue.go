@@ -1,22 +1,30 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 )
 
+
 // AlertQueue processes alert payloads sequentially via a single consumer goroutine.
 type AlertQueue struct {
-	ch     chan *AlertmanagerPayload
-	client *OpenClawClient
-	wg     sync.WaitGroup
+	ch       chan *AlertmanagerPayload
+	client   *OpenClawClient
+	wg       sync.WaitGroup
+	ctx      context.Context
+	cancel   context.CancelFunc
+	stopOnce sync.Once
 }
 
 // NewAlertQueue creates a buffered queue with capacity 100.
 func NewAlertQueue(client *OpenClawClient) *AlertQueue {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &AlertQueue{
 		ch:     make(chan *AlertmanagerPayload, 100),
 		client: client,
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }
 
@@ -29,7 +37,7 @@ func (q *AlertQueue) Start() {
 			alertname := payload.CommonLabels["alertname"]
 			slog.Info("processing alert", "alertname", alertname, "status", payload.Status, "alert_count", len(payload.Alerts))
 
-			if err := q.client.Forward(payload); err != nil {
+			if err := q.client.Forward(q.ctx, payload); err != nil {
 				slog.Error("failed to forward alert to openclaw", "alertname", alertname, "error", err)
 			} else {
 				slog.Info("alert forwarded to openclaw", "alertname", alertname)
@@ -50,8 +58,12 @@ func (q *AlertQueue) Enqueue(payload *AlertmanagerPayload) bool {
 	}
 }
 
-// Stop closes the channel and waits for the consumer to drain remaining items.
+// Stop cancels in-flight operations, closes the channel, and waits for the consumer to drain.
 func (q *AlertQueue) Stop() {
-	close(q.ch)
+	q.stopOnce.Do(func() {
+		q.cancel()
+		slog.Info("draining alert queue", "remaining", len(q.ch))
+		close(q.ch)
+	})
 	q.wg.Wait()
 }

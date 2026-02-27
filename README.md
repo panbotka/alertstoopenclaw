@@ -14,10 +14,13 @@ When an alert fires, alertstoclaude formats a structured prompt containing the f
 - Filters out resolved alerts (only forwards firing)
 - Sequential processing queue (one alert at a time)
 - Retry with exponential backoff (3 attempts, 1s and 2s between retries)
+- Context-aware shutdown — cancels in-flight requests and retries on SIGINT/SIGTERM
 - Optional bearer token authentication for inbound webhooks
+- Request hardening: 1 MB body limit, Content-Type validation, server timeouts
 - Structured JSON logging via `log/slog`
 - Health check endpoint at `GET /healthz`
 - Graceful shutdown with queue draining
+- Non-root Docker container
 - Zero external dependencies (Go stdlib only)
 
 ## Quick Start
@@ -52,6 +55,7 @@ All configuration is via environment variables.
 | `OPENCLAW_URL` | Yes | — | OpenClaw base URL (e.g. `http://openclaw:18789`) |
 | `OPENCLAW_TOKEN` | Yes | — | Bearer token for OpenClaw API |
 | `WEBHOOK_TOKEN` | No | *(disabled)* | If set, inbound webhooks must include `Authorization: Bearer <token>` |
+| `OPENCLAW_MODEL` | No | `openclaw:main` | Model name sent to OpenClaw API |
 
 ## Grafana Alertmanager Setup
 
@@ -66,7 +70,7 @@ If you set `WEBHOOK_TOKEN`, configure the contact point to send an `Authorizatio
 
 ### `POST /webhook`
 
-Receives Alertmanager webhook payloads. Returns `200 OK` immediately after enqueuing (or after ignoring non-firing alerts). Returns `401 Unauthorized` if `WEBHOOK_TOKEN` is set and the request lacks a valid bearer token. Returns `400 Bad Request` for malformed JSON.
+Receives Alertmanager webhook payloads. Returns `200 OK` immediately after enqueuing (or after ignoring non-firing alerts). Returns `401 Unauthorized` if `WEBHOOK_TOKEN` is set and the request lacks a valid bearer token. Returns `400 Bad Request` for malformed or oversized (>1 MB) JSON. Returns `415 Unsupported Media Type` if Content-Type is present but not `application/json`. Returns `503 Service Unavailable` if the processing queue is full (Alertmanager will retry).
 
 ### `GET /healthz`
 

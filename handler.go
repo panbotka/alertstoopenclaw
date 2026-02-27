@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 )
 
 // NewMux creates the HTTP handler with /webhook and /healthz routes.
@@ -26,6 +27,19 @@ func webhookHandler(queue *AlertQueue, webhookToken string) http.HandlerFunc {
 			}
 		}
 
+		// Validate Content-Type if present.
+		if ct := r.Header.Get("Content-Type"); ct != "" {
+			mediaType := strings.TrimSpace(strings.SplitN(ct, ";", 2)[0])
+			if !strings.EqualFold(mediaType, "application/json") {
+				slog.Warn("unsupported content type", "content_type", ct)
+				http.Error(w, "Unsupported Media Type", http.StatusUnsupportedMediaType)
+				return
+			}
+		}
+
+		// Limit request body to 1 MB.
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 		var payload AlertmanagerPayload
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			slog.Warn("invalid webhook payload", "error", err)
@@ -42,6 +56,8 @@ func webhookHandler(queue *AlertQueue, webhookToken string) http.HandlerFunc {
 
 		if !queue.Enqueue(&payload) {
 			slog.Warn("failed to enqueue alert, queue full")
+			http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
