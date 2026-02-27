@@ -13,7 +13,7 @@ There are no external dependencies (stdlib only).
 
 **Test:** `make test` (runs `go test -v -race ./...`)
 
-**Lint:** `golangci-lint run` (available on this system)
+**Lint:** `golangci-lint run` (strict config in `.golangci.yml`: cyclomatic complexity max 10, exported comment enforcement)
 
 **Docker:**
 ```bash

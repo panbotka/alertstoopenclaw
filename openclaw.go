@@ -61,6 +61,35 @@ Report your findings and the current status (resolved, in-progress, or needs-man
 	return prompt, nil
 }
 
+// doRequest sends a single HTTP request to OpenClaw and returns nil on success.
+func (c *OpenClawClient) doRequest(ctx context.Context, url string, body []byte, attempt int) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		slog.Warn("openclaw request error", "attempt", attempt, "error", err)
+		return fmt.Errorf("request failed: %w", err)
+	}
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+		return nil
+	}
+
+	// Read up to 512 bytes of the error response body for logging.
+	errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	_ = resp.Body.Close()
+
+	slog.Warn("openclaw non-2xx response", "attempt", attempt, "status", resp.StatusCode, "body", string(errBody))
+	return fmt.Errorf("openclaw returned status %d", resp.StatusCode)
+}
+
 // Forward sends the alert payload to OpenClaw with up to 3 retries and exponential backoff.
 func (c *OpenClawClient) Forward(ctx context.Context, payload *AlertmanagerPayload) error {
 	prompt, err := buildPrompt(payload)
@@ -95,32 +124,10 @@ func (c *OpenClawClient) Forward(ctx context.Context, payload *AlertmanagerPaylo
 			}
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bodyBytes))
-		if err != nil {
-			return fmt.Errorf("create request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+c.token)
-
-		resp, err := c.client.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("request failed: %w", err)
-			slog.Warn("openclaw request error", "attempt", attempt+1, "error", err)
-			continue
-		}
-
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
+		lastErr = c.doRequest(ctx, url, bodyBytes, attempt+1)
+		if lastErr == nil {
 			return nil
 		}
-
-		// Read up to 512 bytes of the error response body for logging.
-		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		_ = resp.Body.Close()
-
-		lastErr = fmt.Errorf("openclaw returned status %d", resp.StatusCode)
-		slog.Warn("openclaw non-2xx response", "attempt", attempt+1, "status", resp.StatusCode, "body", string(errBody))
 	}
 
 	return fmt.Errorf("openclaw request failed after 3 attempts: %w", lastErr)

@@ -1,0 +1,17 @@
+version: "2"
+
+linters:
+  enable:
+    - cyclop
+    - gocyclo
+    - revive
+  settings:
+    cyclop:
+      max-complexity: 10
+    gocyclo:
+      min-complexity: 10
+    revive:
+      extra-rules:
+        - name: exported
+          arguments:
+            - "checkPrivateReceivers"

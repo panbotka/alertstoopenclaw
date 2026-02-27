@@ -34,7 +34,7 @@ func testPayload(status string) string {
 
 func TestFiringAlert(t *testing.T) {
 	called := make(chan struct{}, 1)
-	ocServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ocServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		select {
 		case called <- struct{}{}:
@@ -68,7 +68,7 @@ func TestFiringAlert(t *testing.T) {
 
 func TestResolvedAlert(t *testing.T) {
 	var called bool
-	ocServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ocServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
 	}))

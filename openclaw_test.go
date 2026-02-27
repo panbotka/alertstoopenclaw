@@ -39,7 +39,7 @@ func TestBuildPrompt(t *testing.T) {
 }
 
 func TestForward_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -58,7 +58,7 @@ func TestForward_Success(t *testing.T) {
 
 func TestForward_Retry(t *testing.T) {
 	var count atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		n := count.Add(1)
 		if n < 3 {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -86,7 +86,7 @@ func TestForward_Retry(t *testing.T) {
 
 func TestForward_AllRetriesFail(t *testing.T) {
 	var count atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -114,7 +114,7 @@ func TestForward_AllRetriesFail(t *testing.T) {
 
 func TestForward_ContextCancelled(t *testing.T) {
 	var count atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
 	}))

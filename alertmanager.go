@@ -1,3 +1,5 @@
+// Package main implements alertstoopenclaw, a bridge service that forwards
+// Grafana Alertmanager webhooks to an OpenClaw instance.
 package main
 
 // AlertmanagerPayload represents the webhook JSON payload sent by Grafana Alertmanager.
