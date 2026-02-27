@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run
 
 ```bash
-go build -o alertstoclaude .
-OPENCLAW_URL=http://openclaw:18789 OPENCLAW_TOKEN=<token> ./alertstoclaude
+go build -o alertstoopenclaw .
+OPENCLAW_URL=http://openclaw:18789 OPENCLAW_TOKEN=<token> ./alertstoopenclaw
 ```
 
 There are no external dependencies (stdlib only).
@@ -17,8 +17,8 @@ There are no external dependencies (stdlib only).
 
 **Docker:**
 ```bash
-docker build -t alertstoclaude .
-docker run -e OPENCLAW_URL=... -e OPENCLAW_TOKEN=... -p 8080:8080 alertstoclaude
+docker build -t alertstoopenclaw .
+docker run -e OPENCLAW_URL=... -e OPENCLAW_TOKEN=... -p 8080:8080 alertstoopenclaw
 ```
 
 ## Architecture

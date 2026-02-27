@@ -30,7 +30,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("starting alertstoclaude",
+	slog.Info("starting alertstoopenclaw",
 		"listen_addr", listenAddr,
 		"openclaw_url", openclawURL,
 		"openclaw_model", openclawModel,

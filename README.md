@@ -1,12 +1,12 @@
-# alertstoclaude
+# alertstoopenclaw
 
 A lightweight Go service that receives [Grafana Alertmanager](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/) webhook notifications and forwards them to an [OpenClaw](https://github.com/anthropics/openclaw) instance for autonomous investigation and remediation.
 
 ```
-Grafana Alertmanager --webhook--> [alertstoclaude :8080] --HTTP--> [OpenClaw :18789]
+Grafana Alertmanager --webhook--> [alertstoopenclaw :8080] --HTTP--> [OpenClaw :18789]
 ```
 
-When an alert fires, alertstoclaude formats a structured prompt containing the full alert payload and sends it to OpenClaw's chat completions API. OpenClaw then autonomously investigates the issue, attempts to resolve it, and reports its findings.
+When an alert fires, alertstoopenclaw formats a structured prompt containing the full alert payload and sends it to OpenClaw's chat completions API. OpenClaw then autonomously investigates the issue, attempts to resolve it, and reports its findings.
 
 ## Features
 
@@ -26,23 +26,23 @@ When an alert fires, alertstoclaude formats a structured prompt containing the f
 ## Quick Start
 
 ```bash
-go build -o alertstoclaude .
+go build -o alertstoopenclaw .
 
 OPENCLAW_URL=http://localhost:18789 \
 OPENCLAW_TOKEN=your-token \
-./alertstoclaude
+./alertstoopenclaw
 ```
 
 ## Docker
 
 ```bash
-docker build -t alertstoclaude .
+docker build -t alertstoopenclaw .
 
 docker run \
   -e OPENCLAW_URL=http://openclaw:18789 \
   -e OPENCLAW_TOKEN=your-token \
   -p 8080:8080 \
-  alertstoclaude
+  alertstoopenclaw
 ```
 
 ## Configuration
@@ -59,9 +59,9 @@ All configuration is via environment variables.
 
 ## Grafana Alertmanager Setup
 
-Add a webhook contact point in Grafana pointing to your alertstoclaude instance:
+Add a webhook contact point in Grafana pointing to your alertstoopenclaw instance:
 
-- **URL:** `http://alertstoclaude:8080/webhook`
+- **URL:** `http://alertstoopenclaw:8080/webhook`
 - **HTTP Method:** POST
 
 If you set `WEBHOOK_TOKEN`, configure the contact point to send an `Authorization` header with `Bearer <your-token>`.
