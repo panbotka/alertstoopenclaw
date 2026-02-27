@@ -65,7 +65,7 @@ func main() {
 	// Give in-flight HTTP requests 5 seconds to complete.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 
 	// Drain the alert queue.
 	queue.Stop()

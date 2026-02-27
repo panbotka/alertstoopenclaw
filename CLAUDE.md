@@ -9,7 +9,9 @@ go build -o alertstoclaude .
 OPENCLAW_URL=http://openclaw:18789 OPENCLAW_TOKEN=<token> ./alertstoclaude
 ```
 
-There are no external dependencies (stdlib only) and no tests yet. No linter is configured.
+There are no external dependencies (stdlib only) and no tests yet.
+
+**Lint:** `golangci-lint run` (available on this system)
 
 **Docker:**
 ```bash
@@ -46,4 +48,5 @@ All via environment variables — no config files:
 - **Firing only** — resolved alerts are ignored (return 200, no forwarding)
 - **No deduplication** — relies on Alertmanager's grouping/repeat_interval
 - **Queue buffer: 100** — alerts are dropped with a warning log if full
-- **30s HTTP timeout** per OpenClaw request; retries: 3 attempts with 1s/2s/4s backoff
+- **30s HTTP timeout** per OpenClaw request; retries: 3 attempts with 1s/2s backoff between retries
+- **CI** — GitHub Actions workflow builds and pushes multi-arch Docker image to GHCR

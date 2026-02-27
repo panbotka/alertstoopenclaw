@@ -13,7 +13,7 @@ When an alert fires, alertstoclaude formats a structured prompt containing the f
 - Receives Alertmanager webhook payloads on `POST /webhook`
 - Filters out resolved alerts (only forwards firing)
 - Sequential processing queue (one alert at a time)
-- Retry with exponential backoff (3 attempts: 1s, 2s, 4s)
+- Retry with exponential backoff (3 attempts, 1s and 2s between retries)
 - Optional bearer token authentication for inbound webhooks
 - Structured JSON logging via `log/slog`
 - Health check endpoint at `GET /healthz`
